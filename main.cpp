@@ -1,17 +1,30 @@
 #include <iostream>
 #include <thread>
+#include <vector>
+#include <mutex>
 
-void test(int x) {
-  std::cout<<"Hello from thread"<<std::endl;
-  std::cout<<"Argument passed in : "<<x<<std::endl;
+std::mutex lock;
+static int counterValue = 100;
+void updateCounterValue() {
+  lock.lock();
+    counterValue += 1;
+    std::cout << "counterValue: " << counterValue << std::endl;
+  lock.unlock();
 }
 
 int main() {
   
-  std::thread myThread(&test,  100);
-  myThread.join();
-  
-  
+auto lambda =[](int x) {
+  std::cout<<"Hello from thread "<<std::this_thread::get_id()<<std::endl;
+  std::cout<<"Argument passed in : "<<x<<std::endl;
+};
+  std::vector<std::jthread> jThreads;
+  for (int i = 0; i < 10; i++) {
+    jThreads.emplace_back(updateCounterValue);
+  }
+  for (auto& jThread : jThreads) {
+    jThread.join();
+  }
   std::cout<<"Hello from main thread"<<std::endl;
   return 0;
 }
