@@ -1,27 +1,80 @@
 #include <atomic>
 #include <iostream>
+#include <mutex>
 #include <thread>
 #include <vector>
 
-static std::atomic<int> counterValue = 0;
+std::mutex lock;
+std::atomic<int> sharedJob{0};
 
-void updateCounterValue() {
-  std::cout << "counterValue: " << counterValue << std::endl;
+int calculateSumValue(const std::vector<int>& numbers)
+{
+    int sum{};
+
+    for (auto number : numbers)
+        sum += number;
+
+    return sum;
 }
 
-int main() {
+void calculateSquareValue(int number, std::vector<int>& results)
+{
+    int result = number * number;
 
-  auto lambda = [](int x) {
-    std::cout << "Hello from thread " << std::this_thread::get_id() << std::endl;
-    std::cout << "Argument passed in : " << x << std::endl;
-  };
-  std::vector<std::jthread> jThreads;
-  for (int i = 0; i < 10; i++) {
-    jThreads.emplace_back(updateCounterValue);
-  }
-  for (auto &jThread : jThreads) {
-    jThread.join();
-  }
-  std::cout << "Hello from main thread" << std::endl;
-  return 0;
+    {
+        std::lock_guard guard(lock);
+
+        results.push_back(result);
+
+        std::cout
+            << "Thread " << std::this_thread::get_id()
+            << " calculated "
+            << number << " * " << number
+            << " = " << result
+            << std::endl;
+    }
+}
+
+void workerFunction(const std::vector<int>& numbers,
+                    std::vector<int>& results)
+{
+    while (true)
+    {
+        int index = sharedJob++;
+
+        if (index >= numbers.size())
+            break;
+
+        calculateSquareValue(numbers[index], results);
+    }
+}
+
+int main()
+{
+    std::vector<std::jthread> jThreads;
+
+    std::vector<int> numbers = {
+        5, 8, 12, 20, 3, 7, 11, 15
+    };
+
+    std::vector<int> results;
+
+    for (int i = 0; i < 2; i++)
+    {
+        jThreads.emplace_back(
+            workerFunction,
+            std::cref(numbers),
+            std::ref(results)
+        );
+    }
+
+    for (auto& jThread : jThreads)
+    {
+        jThread.join();
+    }
+
+    std::cout
+        << "Sum = "
+        << calculateSumValue(results)
+        << std::endl;
 }
